@@ -37,8 +37,10 @@ Billing-System/
 ## Backend Health, Port, and Configuration
 
 - Default backend port is 3001 (override via PORT env).
-- Health endpoint: `GET /health` returns `{ status, port, supabaseEnv }`.
+- Health endpoint: `GET /health` returns `{ status, port, supabaseEnv, warnings }`.
 - Non-sensitive config: `GET /api/meta/config`.
+- Router pings: `GET /api/product/ping`, `GET /api/billinghistory/ping`.
+- DB check: `POST /api/admin/db/check` to verify required tables exist; returns hints if missing.
 - Required envs: `SUPABASE_URL`, `SUPABASE_KEY`. See `backend/.env.example`.
 - Initialize tables by running SQL in `backend/scripts/supabase_init.sql` inside Supabase.
 

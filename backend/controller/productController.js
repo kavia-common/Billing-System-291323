@@ -15,9 +15,13 @@ function translateDbError(error) {
   return error.message || "Unexpected database error";
 }
 
-// PUBLIC_INTERFACE
+/** PUBLIC_INTERFACE
+ * addProduct
+ * Create a product in Supabase.
+ * Request body: { description: string, cp: number, sp: number }
+ * Response: { success: boolean, message: string }
+ */
 export const addProduct = async (req, res) => {
-  /** Create a product in Supabase. Expects { description, cp, sp } in body. */
   try {
     const { description, cp, sp } = req.body;
     if (!description || cp === undefined || sp === undefined) {
@@ -40,9 +44,12 @@ export const addProduct = async (req, res) => {
   }
 };
 
-// PUBLIC_INTERFACE
+/** PUBLIC_INTERFACE
+ * removeProduct
+ * Remove a product by id passed in headers.id
+ * Response: { success: boolean, message: string }
+ */
 export const removeProduct = async (req, res) => {
-  /** Remove a product by id passed in headers.id */
   try {
     const id = req.headers.id;
     if (!id) return res.json({ success: false, message: "id header required" });
@@ -56,9 +63,12 @@ export const removeProduct = async (req, res) => {
   }
 };
 
-// PUBLIC_INTERFACE
+/** PUBLIC_INTERFACE
+ * listProducts
+ * List all products.
+ * Response: { success: boolean, products: Array<{ _id, description, cp, sp, created_at }> }
+ */
 export const listProducts = async (req, res) => {
-  /** List all products */
   try {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase
@@ -83,9 +93,13 @@ export const listProducts = async (req, res) => {
   }
 };
 
-// PUBLIC_INTERFACE
+/** PUBLIC_INTERFACE
+ * updateProduct
+ * Update a product by id.
+ * Request body: { id: string, description: string, cp: number, sp: number }
+ * Response: { success: boolean, message: string }
+ */
 export const updateProduct = async (req, res) => {
-  /** Update a product by id. Body: { id, description, cp, sp } */
   try {
     const { id, description, cp, sp } = req.body;
     if (!id) return res.json({ success: false, message: "id is required" });

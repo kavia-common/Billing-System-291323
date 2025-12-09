@@ -27,9 +27,14 @@ Run the SQL in backend/scripts/supabase_init.sql in the Supabase SQL editor:
   - status: ok
   - port
   - supabaseEnv: { hasUrl, hasKey }
+  - warnings: array of non-fatal warnings
 
 - GET /api/meta/config — non-sensitive flags:
   - supabaseConfigured: boolean (true if both env vars present)
+
+- GET /api/product/ping and GET /api/billinghistory/ping — validate router mount
+
+- POST /api/admin/db/check — probes that tables exist; returns hints to run backend/scripts/supabase_init.sql if missing.
 
 If API responses indicate relation “products” or “billing_history” does not exist, you likely need to run the SQL above.
 

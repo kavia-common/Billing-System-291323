@@ -10,6 +10,12 @@ import {
 
 const billingHistoryRouter = express.Router();
 
+// PUBLIC_INTERFACE
+billingHistoryRouter.get("/ping", (req, res) => {
+  /** Returns a simple OK response for router diagnostics. */
+  res.json({ ok: true, route: "billinghistory" });
+});
+
 billingHistoryRouter.post("/add", addBillingHistory);
 billingHistoryRouter.get("/list", listBillingHistory);
 billingHistoryRouter.get("/lasthist", retrieveLastProduct);

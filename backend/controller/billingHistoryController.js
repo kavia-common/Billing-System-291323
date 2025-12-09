@@ -90,9 +90,13 @@ export const addBillingHistory = async (req, res) => {
   }
 };
 
-// PUBLIC_INTERFACE
+/** PUBLIC_INTERFACE
+ * listBillingHistory
+ * List billing history records.
+ * Query params: ?customer=<partial-name> (optional)
+ * Response: { success: boolean, billingHistory: Array<...> }
+ */
 export const listBillingHistory = async (req, res) => {
-  /** List billing history records (optionally filtered by customer via ?customer=) */
   try {
     const supabase = getSupabaseClient();
     const customer = req.query.customer;
@@ -116,9 +120,12 @@ export const listBillingHistory = async (req, res) => {
   }
 };
 
-// PUBLIC_INTERFACE
+/** PUBLIC_INTERFACE
+ * clearBillingHistory
+ * Clear all billing history.
+ * Response: { success: boolean, message: string }
+ */
 export const clearBillingHistory = async (req, res) => {
-  /** Clear all billing history */
   try {
     const supabase = getSupabaseClient();
     const { error } = await supabase.from("billing_history").delete().neq("id", "00000000-0000-0000-0000-000000000000");
@@ -130,9 +137,12 @@ export const clearBillingHistory = async (req, res) => {
   }
 };
 
-// PUBLIC_INTERFACE
+/** PUBLIC_INTERFACE
+ * retrieveLastProduct
+ * Compute next bill number like IMSW<number>, based on last record's bill_no.
+ * Response: { success: boolean, billNumber?: string, message?: string }
+ */
 export const retrieveLastProduct = async (req, res) => {
-  /** Compute next bill number like IMSW<number>, based on last record's bill_no. */
   try {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase
@@ -157,9 +167,12 @@ export const retrieveLastProduct = async (req, res) => {
   }
 };
 
-// PUBLIC_INTERFACE
+/** PUBLIC_INTERFACE
+ * removeHistory
+ * Remove a billing history by id in headers.id
+ * Response: { success: boolean, message: string }
+ */
 export const removeHistory = async (req, res) => {
-  /** Remove a billing history by id in headers.id */
   try {
     const id = req.headers.id;
     if (!id) return res.json({ success: false, message: "id header required" });
@@ -175,9 +188,13 @@ export const removeHistory = async (req, res) => {
   }
 };
 
-// PUBLIC_INTERFACE
+/** PUBLIC_INTERFACE
+ * editBillHistory
+ * Update a billing history.
+ * Request body: { bill: { _id: string, billNum: string, billTo: string, billFrom?: string, products: Array<{...}>, totalAmt?: number } }
+ * Response: { success: boolean, message: string }
+ */
 export const editBillHistory = async (req, res) => {
-  /** Update a billing history. Expects { bill } in body with fields like existing UI record. */
   try {
     const billingHistoryData = req.body.bill;
     if (!billingHistoryData || !billingHistoryData._id) {
