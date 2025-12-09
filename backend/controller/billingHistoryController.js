@@ -1,144 +1,200 @@
-import billingHistoryModel from "../models/billingHistoryModel.js";
+import { getSupabaseClient } from "../lib/supabaseClient.js";
 
-const addBillingHistory = async (req, res) => {
-    try {
-        const { products, date, time, billNum, billTo, billFrom } = req.body
+/**
+ * Billing history controller backed by Supabase (Postgres).
+ * Table schema:
+ *  billing_history(id uuid pk default uuid_generate_v4(),
+ *    bill_no text, customer_name text, bill_from text, items jsonb,
+ *    total numeric(12,2), paid numeric(12,2), balance numeric(12,2),
+ *    notes text, created_at timestamptz default now())
+ *
+ * The existing frontend expects fields:
+ *  billNum, billTo, billFrom, products(array of { _id, description, cp, sp, quantity }), totalAmt, date, time, savings
+ * We will map to and from our schema to preserve UI behavior.
+ */
 
-        const today = new Date();
-        const yyyy = today.getFullYear();
-        let mm = today.getMonth() + 1;
-        let dd = today.getDate();
-
-        if (dd < 10) dd = '0' + dd;
-        if (mm < 10) mm = '0' + mm;
-
-        const formattedToday = dd + '/' + mm + '/' + yyyy;
-
-        function convertToIST(date) {
-            // Create a new Date object for the IST timezone
-            const istDate = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-            
-            // Format the date to 12-hour format with AM/PM
-            const options = {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: true
-            };
-            
-            const timeIn12HourFormat = istDate.toLocaleString('en-US', options);
-            
-            return timeIn12HourFormat;
-        }
-        
-        const localTime = new Date(); 
-
-        let netAmt = products.map(value => value.quantity*value.sp)
-        let sum = 0;
-        netAmt.forEach(num => sum+=num) 
-
-        let savings = 0;
-        let cpSum = 0
-        let savingsNetAmt = products.map(value => value.quantity*value.cp)
-        savingsNetAmt.forEach(num => cpSum+=num)
-        savings = sum-cpSum
-
-        const billingHistoryData = {
-            billNum,
-            billTo,
-            billFrom,
-            products,
-            totalAmt : sum,
-            date : date || formattedToday,
-            time : time || convertToIST(localTime),
-            savings
-        }
-
-        const billingHistory = new billingHistoryModel(billingHistoryData)
-        await billingHistory.save()
-        res.json({success : true, message : "History Saved"})
-
-    } catch (error) {
-        console.log(error);
-        res.json({success : false, message : error.message})
-    }
+// Compute totals and savings from items
+function computeTotals(products) {
+  const totalAmt = products.reduce((s, it) => s + Number(it.sp || 0) * Number(it.quantity || 0), 0);
+  const cpSum = products.reduce((s, it) => s + Number(it.cp || 0) * Number(it.quantity || 0), 0);
+  const savings = totalAmt - cpSum;
+  return { totalAmt, savings };
 }
 
-const listBillingHistory = async (req, res) => {
-    try {
-        const billingHistory = await billingHistoryModel.find({})
-        res.json({success : true, billingHistory})
+function toFrontendRecord(row) {
+  const createdAt = row.created_at ? new Date(row.created_at) : new Date();
+  const dd = String(createdAt.getDate()).padStart(2, "0");
+  const mm = String(createdAt.getMonth() + 1).padStart(2, "0");
+  const yyyy = createdAt.getFullYear();
+  const date = `${dd}/${mm}/${yyyy}`;
+  const time = createdAt.toLocaleTimeString("en-US", { hour12: true });
 
-    } catch (error) {
-        console.log(error);
-        res.json({success : false, message : error.message})
-    }
+  // items -> products
+  const products = Array.isArray(row.items) ? row.items : [];
+  const { totalAmt, savings } = computeTotals(products);
+
+  return {
+    _id: row.id,
+    billNum: row.bill_no,
+    billTo: row.customer_name,
+    billFrom: row.bill_from || "",
+    products,
+    totalAmt: Number(row.total ?? totalAmt),
+    date,
+    time,
+    savings: Number(row.savings ?? savings),
+  };
 }
 
-const clearBillingHistory = async (req, res) => {
-    try {
-        await billingHistoryModel.deleteMany()
-        res.json({success : true, message : "History Cleared"})
-    } catch (error) {
-        console.log(error);
-        res.json({success : false, message : error.message})
+// PUBLIC_INTERFACE
+export const addBillingHistory = async (req, res) => {
+  /** Create a billing history record. Expects body: { products, billNum, billTo, billFrom, date?, time? } */
+  try {
+    const { products, date, time, billNum, billTo, billFrom } = req.body;
+
+    if (!Array.isArray(products) || !billNum || !billTo) {
+      return res.json({ success: false, message: "products[], billNum and billTo are required" });
     }
-}
 
-const retrieveLastProduct = async (req, res) => {
-    try {
-        const lastProduct = await billingHistoryModel.find().sort({ _id: -1 }).limit(1);
-        let newBillNumber;
+    const { totalAmt, savings } = computeTotals(products);
 
-        if (lastProduct.length !== 0) {
-            const lastBillNumber = lastProduct[0].billNum;
-            let billNumber = lastBillNumber.slice(4); 
-            billNumber = Number(billNumber);
-            newBillNumber = "IMSW" + (billNumber + 1); 
-        } else {
-            newBillNumber = "IMSW25000"; 
-        }
+    const supabase = getSupabaseClient();
+    const { error } = await supabase.from("billing_history").insert([
+      {
+        bill_no: billNum,
+        customer_name: billTo,
+        bill_from: billFrom || "",
+        items: products,
+        total: totalAmt,
+        notes: null,
+        paid: null,
+        balance: null,
+        // created_at is default now(); date/time fields are derived client-side in existing UI
+        savings,
+      },
+    ]);
+    if (error) throw error;
 
-        res.json({ success: true, billNumber: newBillNumber });
-    } catch (error) {
-        console.log(error);
-        res.json({ success: false, message: error.message });
+    res.json({ success: true, message: "History Saved" });
+  } catch (error) {
+    console.log(error);
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// PUBLIC_INTERFACE
+export const listBillingHistory = async (req, res) => {
+  /** List billing history records (optionally filtered by customer via ?customer=) */
+  try {
+    const supabase = getSupabaseClient();
+    const customer = req.query.customer;
+    let query = supabase
+      .from("billing_history")
+      .select("id, bill_no, customer_name, bill_from, items, total, notes, paid, balance, savings, created_at")
+      .order("created_at", { ascending: true }); // frontends reverse themselves
+
+    if (customer) {
+      query = query.ilike("customer_name", `%${customer}%`);
     }
-}
 
-const removeHistory = async (req, res) => {
-    try {
-        await billingHistoryModel.findByIdAndDelete(req.headers.id)
-        res.json({success : true, message : "History Removed"})
-    } catch (error) {
-        console.log(error)
-        res.json({success : false, message : error.message})
+    const { data, error } = await query;
+    if (error) throw error;
+
+    const billingHistory = (data || []).map(toFrontendRecord);
+    res.json({ success: true, billingHistory });
+  } catch (error) {
+    console.log(error);
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// PUBLIC_INTERFACE
+export const clearBillingHistory = async (req, res) => {
+  /** Clear all billing history */
+  try {
+    const supabase = getSupabaseClient();
+    const { error } = await supabase.from("billing_history").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    if (error) throw error;
+    res.json({ success: true, message: "History Cleared" });
+  } catch (error) {
+    console.log(error);
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// PUBLIC_INTERFACE
+export const retrieveLastProduct = async (req, res) => {
+  /** Compute next bill number like IMSW<number>, based on last record's bill_no. */
+  try {
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase
+      .from("billing_history")
+      .select("bill_no, created_at")
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (error) throw error;
+
+    let newBillNumber;
+    if (data && data.length > 0 && data[0].bill_no) {
+      const last = data[0].bill_no;
+      const suffix = Number(String(last).replace(/^\D+/g, "")) || 25000;
+      newBillNumber = "IMSW" + (suffix + 1);
+    } else {
+      newBillNumber = "IMSW25000";
     }
-}
+    res.json({ success: true, billNumber: newBillNumber });
+  } catch (error) {
+    console.log(error);
+    res.json({ success: false, message: error.message });
+  }
+};
 
-const editBillHistory = async (req, res) => {
-    try {
-        const billingHistoryData = req.body.bill
-        const { _id, billNum, billTo, billFrom, products, totalAmt, date, time, savings } = billingHistoryData
-        
-        const updatedBill = await billingHistoryModel.findByIdAndUpdate(_id, {
-            billNum,
-            billFrom,
-            billTo,
-            products,
-            totalAmt,
-            date,
-            time,
-            savings
-        })
+// PUBLIC_INTERFACE
+export const removeHistory = async (req, res) => {
+  /** Remove a billing history by id in headers.id */
+  try {
+    const id = req.headers.id;
+    if (!id) return res.json({ success: false, message: "id header required" });
 
-        res.json({success : true, message : "History Updated"})
-    } catch (error) {
-        console.log(error)
-        res.json({success : false, message : error.message})
+    const supabase = getSupabaseClient();
+    const { error } = await supabase.from("billing_history").delete().eq("id", id);
+    if (error) throw error;
+
+    res.json({ success: true, message: "History Removed" });
+  } catch (error) {
+    console.log(error);
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// PUBLIC_INTERFACE
+export const editBillHistory = async (req, res) => {
+  /** Update a billing history. Expects { bill } in body with fields like existing UI record. */
+  try {
+    const billingHistoryData = req.body.bill;
+    if (!billingHistoryData || !billingHistoryData._id) {
+      return res.json({ success: false, message: "bill object with _id is required" });
     }
-}
+    const { _id, billNum, billTo, billFrom, products, totalAmt } = billingHistoryData;
 
+    const { totalAmt: computedTotal, savings } = computeTotals(products || []);
+    const supabase = getSupabaseClient();
+    const { error } = await supabase
+      .from("billing_history")
+      .update({
+        bill_no: billNum,
+        customer_name: billTo,
+        bill_from: billFrom || "",
+        items: products || [],
+        total: Number(totalAmt ?? computedTotal),
+        savings: Number(savings),
+      })
+      .eq("id", _id);
+    if (error) throw error;
 
-
-export { addBillingHistory, listBillingHistory, clearBillingHistory, retrieveLastProduct, removeHistory, editBillHistory }
+    res.json({ success: true, message: "History Updated" });
+  } catch (error) {
+    console.log(error);
+    res.json({ success: false, message: error.message });
+  }
+};

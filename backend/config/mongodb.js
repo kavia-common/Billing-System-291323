@@ -1,12 +1,5 @@
-import mongoose from "mongoose";
-
-const connetDB = async () => {
-
-    mongoose.connection.on('connected', () => {
-        console.log("DB CONNECTED")
-    })
-
-    await mongoose.connect(`${process.env.MONGODB_URI}/billingSystem`)
+export default function connetDB() {
+  // MongoDB integration removed in favor of Supabase.
+  // This stub remains to avoid import errors if any legacy references exist.
+  console.log("MongoDB disabled. Using Supabase instead.");
 }
-
-export default connetDB;
