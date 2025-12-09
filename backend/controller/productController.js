@@ -6,6 +6,15 @@ import { getSupabaseClient } from "../lib/supabaseClient.js";
  *  products(id uuid pk default uuid_generate_v4(), name/description text, cp numeric, sp numeric, created_at timestamptz default now())
  */
 
+function translateDbError(error) {
+  // Map common Postgres errors to helpful hints
+  const msg = (error && (error.message || error.details || error.hint)) || "";
+  if (/relation .*products.* does not exist/i.test(msg)) {
+    return "Products table missing. Run SQL in backend/scripts/supabase_init.sql in Supabase.";
+  }
+  return error.message || "Unexpected database error";
+}
+
 // PUBLIC_INTERFACE
 export const addProduct = async (req, res) => {
   /** Create a product in Supabase. Expects { description, cp, sp } in body. */
@@ -27,7 +36,7 @@ export const addProduct = async (req, res) => {
     res.json({ success: true, message: "Product Added" });
   } catch (error) {
     console.log(error);
-    res.json({ success: false, message: error.message });
+    res.json({ success: false, message: translateDbError(error) });
   }
 };
 
@@ -43,7 +52,7 @@ export const removeProduct = async (req, res) => {
     res.json({ success: true, message: "Product Removed" });
   } catch (error) {
     console.log(error);
-    res.json({ success: false, message: error.message });
+    res.json({ success: false, message: translateDbError(error) });
   }
 };
 
@@ -70,7 +79,7 @@ export const listProducts = async (req, res) => {
     res.json({ success: true, products });
   } catch (error) {
     console.log(error);
-    res.json({ success: false, message: error.message });
+    res.json({ success: false, message: translateDbError(error) });
   }
 };
 
@@ -96,6 +105,6 @@ export const updateProduct = async (req, res) => {
     res.json({ success: true, message: "Product Updated" });
   } catch (error) {
     console.log(error);
-    res.json({ success: false, message: error.message });
+    res.json({ success: false, message: translateDbError(error) });
   }
 };

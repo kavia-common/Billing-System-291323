@@ -46,6 +46,14 @@ function toFrontendRecord(row) {
   };
 }
 
+function translateDbError(error) {
+  const msg = (error && (error.message || error.details || error.hint)) || "";
+  if (/relation .*billing_history.* does not exist/i.test(msg)) {
+    return "Billing history table missing. Run SQL in backend/scripts/supabase_init.sql in Supabase.";
+  }
+  return error.message || "Unexpected database error";
+}
+
 // PUBLIC_INTERFACE
 export const addBillingHistory = async (req, res) => {
   /** Create a billing history record. Expects body: { products, billNum, billTo, billFrom, date?, time? } */
@@ -78,7 +86,7 @@ export const addBillingHistory = async (req, res) => {
     res.json({ success: true, message: "History Saved" });
   } catch (error) {
     console.log(error);
-    res.json({ success: false, message: error.message });
+    res.json({ success: false, message: translateDbError(error) });
   }
 };
 
@@ -104,7 +112,7 @@ export const listBillingHistory = async (req, res) => {
     res.json({ success: true, billingHistory });
   } catch (error) {
     console.log(error);
-    res.json({ success: false, message: error.message });
+    res.json({ success: false, message: translateDbError(error) });
   }
 };
 
@@ -118,7 +126,7 @@ export const clearBillingHistory = async (req, res) => {
     res.json({ success: true, message: "History Cleared" });
   } catch (error) {
     console.log(error);
-    res.json({ success: false, message: error.message });
+    res.json({ success: false, message: translateDbError(error) });
   }
 };
 
@@ -145,7 +153,7 @@ export const retrieveLastProduct = async (req, res) => {
     res.json({ success: true, billNumber: newBillNumber });
   } catch (error) {
     console.log(error);
-    res.json({ success: false, message: error.message });
+    res.json({ success: false, message: translateDbError(error) });
   }
 };
 
@@ -163,7 +171,7 @@ export const removeHistory = async (req, res) => {
     res.json({ success: true, message: "History Removed" });
   } catch (error) {
     console.log(error);
-    res.json({ success: false, message: error.message });
+    res.json({ success: false, message: translateDbError(error) });
   }
 };
 
@@ -195,6 +203,6 @@ export const editBillHistory = async (req, res) => {
     res.json({ success: true, message: "History Updated" });
   } catch (error) {
     console.log(error);
-    res.json({ success: false, message: error.message });
+    res.json({ success: false, message: translateDbError(error) });
   }
 };

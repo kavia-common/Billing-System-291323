@@ -10,7 +10,7 @@ This **Billing System** is a comprehensive, user-friendly application built usin
 ## Tech Stack :
  - **Frontend**: React.js (Vite.js)
  - **Backend**: Node.js, Express.js
- - **Database**: MongoDB
+ - **Database**: Supabase (Postgres)
 
 ## 📂 Project Structure
 ```
@@ -22,23 +22,31 @@ Billing-System/
 │   └── scripts/     # Core frontend functionalities (product handling, billing logic)
 ├── backend/         # Backend-related files (APIs, server, database)
 │   ├── config/      # Configuration files (database connection, settings)
-│   ├── controllers/ # Functions to handle requests and interact with the database
-│   ├── models/      # Database models (schemas)
+│   ├── controller/  # Functions to handle requests and interact with the database
+│   ├── models/      # Placeholder models (Supabase used directly)
 │   ├── routes/      # API routes for different functionalities
-│   ├── scripts/     # Backend logic (billing calculations, inventory management)
-│   └── utils/       # Backend utility functions (helpers, formatters)
+│   ├── scripts/     # Database initialization SQL (Supabase)
+│   └── lib/         # Supabase client configuration
 └── admin/           # Admin panel-related files (admin dashboard, user management)
     ├── assets/      # Static files (CSS, JS, Images)
     ├── components/  # Reusable UI components (admin header, footer, etc.)
-    ├── views/       # Admin views (user management, reports, etc.)
+    ├── pages/       # Admin pages
     └── scripts/     # Admin panel functionalities (CRUD operations, admin logic)
 ```
+
+## Backend Health, Port, and Configuration
+
+- Default backend port is 3001 (override via PORT env).
+- Health endpoint: `GET /health` returns `{ status, port, supabaseEnv }`.
+- Non-sensitive config: `GET /api/meta/config`.
+- Required envs: `SUPABASE_URL`, `SUPABASE_KEY`. See `backend/.env.example`.
+- Initialize tables by running SQL in `backend/scripts/supabase_init.sql` inside Supabase.
 
 ## **Project Setup**
 
 ### **Prerequisites**
- - Node.js (v14 or above)
- - MongoDB (local or cloud setup)
+ - Node.js (v18+ recommended)
+ - A Supabase project
  - npm or yarn
 
 ### **Clone the repository:**
@@ -78,30 +86,34 @@ npm install
 - Add the following variables with appropriate values
 
 ```bash
-# Database connection string
-MONGODB_URI="mongodb://localhost:27017/your-database-name"
+# Server
+PORT=3001
+
+# Supabase
+SUPABASE_URL="https://<your-project>.supabase.co"
+SUPABASE_KEY="<service-role-or-anon-key>"
 ```
 
 **Frontend & Admin**
-- Create a `.env` file in the `frontend & Admin` directory
+- Create a `.env` file in the respective directories
 - Add the following variable:
 ```bash
 # Backend URL (adjust if needed)
-VITE_BACKEND_URL="http://localhost:4000" 
+VITE_BACKEND_URL="http://localhost:3001"
 ```
 
 **Important**
-- Replace all placeholders (e.g., your_database_name, your_email) with your actual values.
+- Replace placeholders with your actual values.
 - Exclude the `.env` file from version control to protect sensitive information.
 
 **Important:**
 - **Separate terminals**: Run the commands in separate terminal windows or use `split terminal` to avoid conflicts.
-- **Nodemon required**: Ensure you have `nodemon` installed globally to run the backend development servers using `npm run dev`. You can install it globally using `npm install -g nodemon`.
+- **Nodemon optional**: You can run the backend with `npm run server`.
 
 #### Start the backend server
 - Navigate to the `backend` directory: `cd backend`
-- Start the server: `npm run server`
-- You should see a message indicating the server is running, usually on port 4000 or you can specify it in the PORT environment variable inside `.env` file.
+- Start the server: `npm run start` or `npm run server`
+- You should see logs indicating the server is running on port 3001 and whether Supabase env vars are present.
 
 #### Start the frontend server:
 - Navigate to the `frontend` directory: `cd frontend`
